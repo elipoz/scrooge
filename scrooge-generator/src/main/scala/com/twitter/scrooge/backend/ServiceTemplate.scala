@@ -185,6 +185,22 @@ trait ServiceTemplate {
       "asyncFunctions" -> v(service.functions.map {
         f => toDictionary(f, Some("Future"))
       }),
+      "asyncFunctionsScala" -> v(service.functions.map {
+        f => toDictionary(f, Some("scala.concurrent.Future"))
+      }),
+      "functions" -> v(service.functions.map {
+        f =>
+          Dictionary(
+            "header" -> v(templates("function")),
+            "headerInfo" -> v(toDictionary(f, Some("Future"))),
+            "headerInfoScala" -> v(toDictionary(f, Some("scala.concurrent.Future"))),
+            "funcName" -> genID(f.funcName.toCamelCase),
+            "argNames" -> {
+              val code = f.args.map { field => genID(field.sid).toData }.mkString(", ")
+              codify(code)
+            }
+          )
+      }),
       "genericFunctions" -> v(service.functions.map {
         f => toDictionary(f, Some("MM"))
       }),

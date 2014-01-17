@@ -16,7 +16,7 @@ import scala.collection.{Map, Set}
 
 {{/public}}
 {{docstring}}
-object {{StructName}} extends ThriftStructCodec3[{{StructName}}] {
+object {{StructName}}Helper extends ThriftStructCodec3[{{StructName}}] {
   private val NoPassthroughFields = immutable$Map.empty[Short, TFieldBlob]
   val Struct = new TStruct("{{StructNameForWire}}")
 {{#fields}}
@@ -30,7 +30,7 @@ object {{StructName}} extends ThriftStructCodec3[{{StructName}}] {
   /**
    * Checks that all required fields are non-null.
    */
-  def validate(_item: {{StructName}}) {
+  def validate(_item: {{StructName}}Helper) {
 {{#fields}}
 {{#required}}
 {{#nullable}}
@@ -90,7 +90,7 @@ object {{StructName}} extends ThriftStructCodec3[{{StructName}}] {
     if (!{{gotName}}) throw new TProtocolException("Required field '{{StructNameForWire}}' was not found in serialized data for struct {{StructName}}")
 {{/required}}
 {{/fields}}
-    new {{InstanceClassName}}(
+    create(
 {{#fields}}
       {{fieldName}},
 {{/fields}}
@@ -106,7 +106,7 @@ object {{StructName}} extends ThriftStructCodec3[{{StructName}}] {
     {{fieldName}}: {{>optionalType}}{{#hasDefaultValue}} = {{defaultFieldValue}}{{/hasDefaultValue}}{{#optional}} = None{{/optional}}
 {{/fields|,}}
   ): {{StructName}} =
-    new {{InstanceClassName}}(
+    {{StructName}}.apply(
 {{#fields}}
       {{fieldName}}
 {{/fields|,}}
@@ -146,33 +146,18 @@ object {{StructName}} extends ThriftStructCodec3[{{StructName}}] {
 
 {{/fields}}
 
-{{#withTrait}}
-  object Immutable extends ThriftStructCodec3[{{StructName}}] {
-    override def encode(_item: {{StructName}}, _oproto: TProtocol) { _item.write(_oproto) }
-    override def decode(_iprot: TProtocol): {{StructName}} = {{StructName}}.decode(_iprot)
-  }
-
-  /**
-   * The default read-only implementation of {{StructName}}.  You typically should not need to
-   * directly reference this class; instead, use the {{StructName}}.apply method to construct
-   * new instances.
-   */
-  class Immutable(
+  def create(
 {{#fields}}
-    val {{fieldName}}: {{>optionalType}},
+    {{fieldName}}: {{>optionalType}}{{#hasDefaultValue}} = {{defaultFieldValue}}{{/hasDefaultValue}}{{#optional}} = None{{/optional}},
 {{/fields}}
-    override val _passthroughFields: immutable$Map[Short, TFieldBlob]
-  ) extends {{StructName}} {
-    def this(
+    passthroughFields: immutable$Map[Short, TFieldBlob] = Map.empty): {{StructName}} = {
+    val instance = new {{StructName}}(
 {{#fields}}
-      {{fieldName}}: {{>optionalType}}{{#hasDefaultValue}} = {{defaultFieldValue}}{{/hasDefaultValue}}{{#optional}} = None{{/optional}}
+        {{fieldName}}
 {{/fields|,}}
-    ) = this(
-{{#fields}}
-      {{fieldName}},
-{{/fields}}
-      Map.empty
     )
+    instance._passthroughFields = passthroughFields
+    instance
   }
 
   /**
@@ -180,51 +165,43 @@ object {{StructName}} extends ThriftStructCodec3[{{StructName}}] {
    * behavior and implement the read-only methods from {{StructName}} using an underlying
    * instance.
    */
-  trait Proxy extends {{StructName}} {
+  trait Proxy extends {{StructName}}Helper {
     protected def {{underlyingStructName}}: {{StructName}}
 {{#fields}}
     override def {{fieldName}}: {{>optionalType}} = {{underlyingStructName}}.{{fieldName}}
 {{/fields}}
-    override def _passthroughFields = {{underlyingStructName}}._passthroughFields
+    _passthroughFields = {{underlyingStructName}}._passthroughFields
   }
-{{/withTrait}}
 }
 
-{{#withTrait}}
-trait {{StructName}}
-{{/withTrait}}
-{{^withTrait}}
-class {{StructName}}(
+object {{StructName}} extends ThriftStructCodec3[{{StructName}}] {
+  override def encode(_item: {{StructName}}, _oproto: TProtocol) { _item.write(_oproto) }
+  override def decode(_iprot: TProtocol): {{StructName}} = {{StructName}}Helper.decode(_iprot)
+}
+
+/**
+ * The default read-only implementation of {{StructName}}.  You typically should not need to
+ * directly reference this class; instead, use the {{StructName}}.apply method to construct
+ * new instances.
+ */
+case class {{StructName}}(
 {{#fields}}
-    val {{fieldName}}: {{>optionalType}},
-{{/fields}}
-    val _passthroughFields: immutable$Map[Short, TFieldBlob])
-{{/withTrait}}
+  {{fieldName}}: {{>optionalType}}{{#hasDefaultValue}} = {{defaultFieldValue}}{{/hasDefaultValue}}{{#optional}} = None{{/optional}}
+{{/fields|,}}
+) extends {{StructName}}Helper
+
+trait {{StructName}}Helper
   extends {{parentType}}
   with {{product}}
   with java.io.Serializable
 {
-  import {{StructName}}._
-{{^withTrait}}
-    def this(
-{{#fields}}
-      {{fieldName}}: {{>optionalType}}{{#hasDefaultValue}} = {{defaultFieldValue}}{{/hasDefaultValue}}{{#optional}} = None{{/optional}}
-{{/fields|,}}
-    ) = this(
-{{#fields}}
-      {{fieldName}},
-{{/fields}}
-      Map.empty
-    )
-{{/withTrait}}
-{{#withTrait}}
+  import {{StructName}}Helper._
 
 {{#fields}}
   def {{fieldName}}: {{>optionalType}}
 {{/fields}}
 
-  def _passthroughFields: immutable$Map[Short, TFieldBlob] = immutable$Map.empty
-{{/withTrait}}
+  var _passthroughFields: immutable$Map[Short, TFieldBlob] = immutable$Map.empty
 
 {{#fields}}
   def _{{indexP1}} = {{fieldName}}
@@ -257,7 +234,7 @@ class {{StructName}}(
 {{/nullable}}
 {{/optional}}
               {{writeFieldValueName}}({{fieldName}}{{#optional}}.get{{/optional}}, _oprot)
-              Some({{StructName}}.{{fieldConst}})
+              Some({{StructName}}Helper.{{fieldConst}})
             } else {
               None
             }
@@ -306,7 +283,7 @@ class {{StructName}}(
 {{/fields}}
       case _ => _passthroughFields += (_blob.id -> _blob)
     }
-    new {{InstanceClassName}}(
+    create(
 {{#fields}}
       {{fieldName}},
 {{/fields}}
@@ -336,7 +313,7 @@ class {{StructName}}(
 {{/fields}}
       case _ =>
     }
-    new {{InstanceClassName}}(
+    create(
 {{#fields}}
       {{fieldName}},
 {{/fields}}
@@ -356,7 +333,7 @@ class {{StructName}}(
 {{/withFieldGettersAndSetters}}
 
   override def write(_oprot: TProtocol) {
-    {{StructName}}.validate(this)
+    {{StructName}}Helper.validate(this)
     _oprot.writeStructBegin(Struct)
 {{#fields}}
 {{#readWriteInfo}}
@@ -384,7 +361,7 @@ class {{StructName}}(
 {{/fields}}
     _passthroughFields: immutable$Map[Short, TFieldBlob] = this._passthroughFields
   ): {{StructName}} =
-    new {{InstanceClassName}}(
+    create(
 {{#fields}}
       {{fieldName}},
 {{/fields}}

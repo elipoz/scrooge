@@ -61,5 +61,74 @@ object {{ServiceName}} {
     extends {{ServiceName}}$FinagleService(
       iface,
       protocolFactory)
+
+
+  trait ScalaFutureIface {
+    def close(): scala.concurrent.Future[Unit] = scala.concurrent.Promise[Unit]().future
+{{#asyncFunctionsScala}}
+    {{>function}}
+{{/asyncFunctionsScala}}
+  }
+
+  import com.twitter.util.{Promise, Return, Throw}
+
+  class ToScalaIface(scalaIface: ScalaFutureIface)(implicit executionContext: scala.concurrent.ExecutionContext) extends FutureIface {
+    private def fromScalaFuture[A](future: scala.concurrent.Future[A]): Future[A] = {
+      val promise = Promise[A]()
+      future onSuccess{case s => promise setValue s}
+      future onFailure{case t => promise setException t}
+      promise
+    }
+{{#functions}}
+    {{#headerInfo}}{{>header}}{{/headerInfo}} = {
+      fromScalaFuture(scalaIface.{{funcName}}({{argNames}}))
+    }
+{{/functions}}
+  }
+
+  private def toScalaFuture[A](future: Future[A]): scala.concurrent.Future[A] = {
+    val promise = scala.concurrent.Promise[A]()
+    future respond {
+      case Return(r) => promise success r
+      case Throw(t)  => promise failure t
+    }
+    promise.future
+  }
+
+  class ToScalaClient(client: FinagledClient) extends ScalaFutureIface {
+    override def close(): scala.concurrent.Future[Unit] = {
+      toScalaFuture(client.service.close())
+    }
+{{#functions}}
+    {{#headerInfoScala}}{{>header}}{{/headerInfoScala}} = {
+      toScalaFuture(client.{{funcName}}({{argNames}}))
+    }
+{{/functions}}
+  }
+
+  import com.twitter.finagle.builder.Server
+  import java.net.SocketAddress
+
+  class ToScalaServer(server: Server) {
+    def close(): scala.concurrent.Future[Unit] = {
+      toScalaFuture(server.close())
+    }
+
+    def localAddress: SocketAddress = server.localAddress
+  }
+
+  object ToScala {
+    def apply(scalaIface: ScalaFutureIface)(implicit executionContext: scala.concurrent.ExecutionContext): FutureIface = {
+      new ToScalaIface(scalaIface)
+    }
+
+    def apply(client: FinagledClient): ScalaFutureIface = {
+      new ToScalaClient(client)
+    }
+
+    def apply(server: Server): ToScalaServer = {
+      new ToScalaServer(server)
+    }
+  }
 {{/withFinagle}}
 }
