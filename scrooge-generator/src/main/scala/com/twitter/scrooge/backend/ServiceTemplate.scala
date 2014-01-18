@@ -176,6 +176,15 @@ trait ServiceTemplate {
       "futureIfaceParent" -> v(service.parent.map { p =>
         genID(getServiceParentID(p)).append(".FutureIface")
       }),
+      "scalaFutureIfaceParent" -> v(service.parent.map { p =>
+        genID(getServiceParentID(p)).append(".ScalaFutureIface")
+      }),
+      "toScalaIfaceParent" -> v(service.parent.map { p =>
+        genID(getServiceParentID(p)).append(".ToScalaIface")
+      }),
+      "toScalaClientParent" -> v(service.parent.map { p =>
+        genID(getServiceParentID(p)).append(".ToScalaClient")
+      }),
       "genericParent" -> service.parent.map { p =>
         genID(getServiceParentID(p)).append("[MM]")
       }.getOrElse(codify("ThriftService")),

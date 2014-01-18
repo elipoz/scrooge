@@ -63,8 +63,10 @@ object {{ServiceName}} {
       protocolFactory)
 
 
-  trait ScalaFutureIface {
+  trait ScalaFutureIface {{#scalaFutureIfaceParent}}extends {{scalaFutureIfaceParent}}{{/scalaFutureIfaceParent}} {
+{{^scalaFutureIfaceParent}}
     def close(): scala.concurrent.Future[Unit] = scala.concurrent.Promise[Unit]().future
+{{/scalaFutureIfaceParent}}
 {{#asyncFunctionsScala}}
     {{>function}}
 {{/asyncFunctionsScala}}
@@ -72,7 +74,8 @@ object {{ServiceName}} {
 
   import com.twitter.util.{Promise, Return, Throw}
 
-  class ToScalaIface(scalaIface: ScalaFutureIface)(implicit executionContext: scala.concurrent.ExecutionContext) extends FutureIface {
+  class ToScalaIface(scalaIface: ScalaFutureIface)(implicit executionContext: scala.concurrent.ExecutionContext)
+  extends {{#toScalaIfaceParent}}{{toScalaIfaceParent}}(scalaIface) with {{/toScalaIfaceParent}}FutureIface {
     private def fromScalaFuture[A](future: scala.concurrent.Future[A]): Future[A] = {
       val promise = Promise[A]()
       future onSuccess{case s => promise setValue s}
@@ -95,9 +98,10 @@ object {{ServiceName}} {
     promise.future
   }
 
-  class ToScalaClient(client: FinagledClient) extends ScalaFutureIface {
+  class ToScalaClient(client: FutureIface)
+  extends {{#toScalaClientParent}}{{toScalaClientParent}}(client) with {{/toScalaClientParent}}ScalaFutureIface {
     override def close(): scala.concurrent.Future[Unit] = {
-      toScalaFuture(client.service.close())
+      toScalaFuture(client.asInstanceOf[FinagledClient].service.close())
     }
 {{#functions}}
     {{#headerInfoScala}}{{>header}}{{/headerInfoScala}} = {

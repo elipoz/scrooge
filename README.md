@@ -42,9 +42,11 @@ SBT users need this:
 
 This is a fork from the original Twitter project. The two major things that are different 
 here are:
+
 1. Generation of case classes from the Thrift IDL (note that this limits the number of
-members to 22)
-2. Seamless conversion from Finagle futures to Scala futures. Example is below (look
+struct members to 22)
+
+2. Seamless conversion from Finagle futures to Scala futures. See example below (look
 for MyTestService.ToScala(...))
 
 Thrift IDL:
