@@ -123,12 +123,14 @@ Server side:
  
     object ServerApp extends App {
       val myserviceImpl = new MyTestServiceImpl
-      val myServer = MyTestService.ToScala(ServerBuilder()
+      
+      val myServerBuilder = ServerBuilder()
         .name("MyTestServer")
         .bindTo(new InetSocketAddress(Constants.MyTestServicePort))
         .codec(ThriftServerFramedCodec())
         .maxConcurrentRequests(5)
-        .build(new MyTestService.FinagledService(MyTestService.ToScala(myserviceImpl), new TBinaryProtocol.Factory())))
+ 
+      val myServer = new MyTestService.ToScalaServer(myServerBuilder, myserviceImpl)
  
       println("press any key to stop")
       System.in.read
@@ -154,10 +156,10 @@ Client side:
         .hosts("localhost:" + Constants.MyTestServicePort)
         .codec(ThriftClientFramedCodec())
         .hostConnectionLimit(1)
-        //.tlsWithoutValidation()
         .build()
  
-      val myClient = MyTestService.ToScala(new MyTestService.FinagledClient(myService, new TBinaryProtocol.Factory()))
+      val myClient = new MyTestService.ToScalaClient(myService)
+      
       val response: Future[Seq[Byte]] = myClient.fetchBlob(7, 42)
       val result = Await.result(response, Duration("3 sec"))
       println("Got response!" + result.length)

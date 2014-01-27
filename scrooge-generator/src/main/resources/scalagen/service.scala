@@ -72,12 +72,10 @@ object {{ServiceName}} {
 {{/asyncFunctionsScala}}
   }
 
-  import com.twitter.util.{Promise, Return, Throw}
-
   class ToScalaIface(scalaIface: ScalaFutureIface)(implicit executionContext: scala.concurrent.ExecutionContext)
   extends {{#toScalaIfaceParent}}{{toScalaIfaceParent}}(scalaIface) with {{/toScalaIfaceParent}}FutureIface {
     private def fromScalaFuture[A](future: scala.concurrent.Future[A]): Future[A] = {
-      val promise = Promise[A]()
+      val promise = com.twitter.util.Promise[A]()
       future onSuccess{case s => promise setValue s}
       future onFailure{case t => promise setException t}
       promise
@@ -92,47 +90,41 @@ object {{ServiceName}} {
   private def toScalaFuture[A](future: Future[A]): scala.concurrent.Future[A] = {
     val promise = scala.concurrent.Promise[A]()
     future respond {
-      case Return(r) => promise success r
-      case Throw(t)  => promise failure t
+      case com.twitter.util.Return(r) => promise success r
+      case com.twitter.util.Throw(t)  => promise failure t
     }
     promise.future
   }
 
-  class ToScalaClient(client: FutureIface)
+  class ToScalaClient(
+            client: com.twitter.finagle.Service[com.twitter.finagle.thrift.ThriftClientRequest, Array[Byte]],
+            clientName: String = "",
+            protocolFactory: TProtocolFactory = new TBinaryProtocol.Factory,
+            stats: com.twitter.finagle.stats.StatsReceiver = com.twitter.finagle.stats.NullStatsReceiver)
   extends {{#toScalaClientParent}}{{toScalaClientParent}}(client) with {{/toScalaClientParent}}ScalaFutureIface {
+    private val finagledClient = new FinagledClient(client, protocolFactory, clientName, stats)
+
     override def close(): scala.concurrent.Future[Unit] = {
-      toScalaFuture(client.asInstanceOf[FinagledClient].service.close())
+      toScalaFuture(client.close())
     }
 {{#functions}}
     {{#headerInfoScala}}{{>header}}{{/headerInfoScala}} = {
-      toScalaFuture(client.{{funcName}}({{argNames}}))
+      toScalaFuture(finagledClient.{{funcName}}({{argNames}}))
     }
 {{/functions}}
   }
 
-  import com.twitter.finagle.builder.Server
-  import java.net.SocketAddress
+  class ToScalaServer(
+            serverBuilder: com.twitter.finagle.builder.ServerBuilder[Array[Byte], Array[Byte], com.twitter.finagle.builder.ServerConfig.Yes, com.twitter.finagle.builder.ServerConfig.Yes, com.twitter.finagle.builder.ServerConfig.Yes],
+            serviceImpl: ScalaFutureIface,
+            protocolFactory: TProtocolFactory  = new TBinaryProtocol.Factory)(implicit executionContext: scala.concurrent.ExecutionContext) {
+    private val server: com.twitter.finagle.builder.Server = serverBuilder.build(new FinagledService(new ToScalaIface(serviceImpl), protocolFactory))
 
-  class ToScalaServer(server: Server) {
     def close(): scala.concurrent.Future[Unit] = {
       toScalaFuture(server.close())
     }
 
-    def localAddress: SocketAddress = server.localAddress
-  }
-
-  object ToScala {
-    def apply(scalaIface: ScalaFutureIface)(implicit executionContext: scala.concurrent.ExecutionContext): FutureIface = {
-      new ToScalaIface(scalaIface)
-    }
-
-    def apply(client: FinagledClient): ScalaFutureIface = {
-      new ToScalaClient(client)
-    }
-
-    def apply(server: Server): ToScalaServer = {
-      new ToScalaServer(server)
-    }
+    def localAddress: java.net.SocketAddress = server.localAddress
   }
 {{/withFinagle}}
 }
