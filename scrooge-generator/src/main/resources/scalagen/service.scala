@@ -114,11 +114,25 @@ object {{ServiceName}} {
 {{/functions}}
   }
 
+  import com.twitter.finagle.builder.{ServerBuilder, ServerConfig}
+  type ServerBuilderYYY = ServerBuilder[Array[Byte], Array[Byte], ServerConfig.Yes, ServerConfig.Yes, ServerConfig.Yes]
+
   class ToScalaServer(
-            serverBuilder: com.twitter.finagle.builder.ServerBuilder[Array[Byte], Array[Byte], com.twitter.finagle.builder.ServerConfig.Yes, com.twitter.finagle.builder.ServerConfig.Yes, com.twitter.finagle.builder.ServerConfig.Yes],
+            serverBuilder: ServerBuilderYYY,
+            finagledService: FinagledService) {
+    private val server: com.twitter.finagle.builder.Server = serverBuilder.build(finagledService)
+
+    def this(
+            serverBuilder: ServerBuilderYYY,
             serviceImpl: ScalaFutureIface,
-            protocolFactory: TProtocolFactory  = new TBinaryProtocol.Factory)(implicit executionContext: scala.concurrent.ExecutionContext) {
-    private val server: com.twitter.finagle.builder.Server = serverBuilder.build(new FinagledService(new ToScalaIface(serviceImpl), protocolFactory))
+            protocolFactory: TProtocolFactory = new TBinaryProtocol.Factory)(implicit executionContext: scala.concurrent.ExecutionContext) =
+        this(serverBuilder, new FinagledService(new ToScalaIface(serviceImpl), protocolFactory))
+
+    def this(
+            serverBuilder: ServerBuilderYYY,
+            futureIface: FutureIface,
+            protocolFactory: TProtocolFactory) =
+        this(serverBuilder, new FinagledService(futureIface, protocolFactory))
 
     def close(): scala.concurrent.Future[Unit] = {
       toScalaFuture(server.close())
